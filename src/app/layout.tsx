@@ -1,9 +1,9 @@
-import { Nunito } from "next/font/google";
+import { Fredoka } from "next/font/google";
 import "./globals.css";
 
-const nunito = Nunito({
+const fredoka = Fredoka({
   subsets: ["latin"],
-  variable: "--font-nunito",
+  variable: "--font-fredoka",
   display: "swap",
 });
 
@@ -14,7 +14,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className={`${nunito.variable} antialiased`}>
+      <body className={`${fredoka.variable} antialiased`}>
         {children}
       </body>
     </html>
