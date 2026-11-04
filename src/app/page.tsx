@@ -7,9 +7,6 @@ import { MainButton } from './_components/MainButton';
 import { StepBar } from './_components/StepBar';
 import { StepCard } from './_components/StepCard';
 import { Step, PhotoItem, PhotoLabel } from './types';
-import { getSupabaseClient } from './_lib/supabase';
-
-const STORAGE_BUCKET = 'training-photos';
 
 const STEP_TITLES = [
   'Add your photos',
@@ -26,6 +23,8 @@ export default function Home() {
   const [trainingStatus, setTrainingStatus] = useState<'idle' | 'training' | 'complete' | 'error'>('idle');
   const [trainingProgress, setTrainingProgress] = useState<number | null>(null);
   const [trainingRound, setTrainingRound] = useState<number | null>(null);
+  const [trainingRounds, setTrainingRounds] = useState<10 | 25 | 50>(10);
+  const [trainingError, setTrainingError] = useState<string | null>(null);
   const uploadRef = useRef<HTMLInputElement>(null);
   const testUploadRef = useRef<HTMLInputElement>(null);
 
@@ -49,19 +48,15 @@ export default function Home() {
 
   const uploadPhoto = async (photo: PhotoItem, target: 'training' | 'test') => {
     try {
-      const safeName = photo.file.name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(-100) || 'image';
-      const storagePath = `${target}/${photo.id}/${safeName}`;
-      const { error } = await getSupabaseClient()
-        .storage
-        .from(STORAGE_BUCKET)
-        .upload(storagePath, photo.file, {
-          cacheControl: '3600',
-          contentType: photo.file.type,
-          upsert: false,
-        });
+      const formData = new FormData();
+      formData.append('file', photo.file);
+      formData.append('target', target);
+      formData.append('id', photo.id);
 
-      if (error) throw error;
-      updatePhoto(target, photo.id, { uploadStatus: 'saved', storagePath, uploadError: undefined });
+      const response = await fetch('/api/photos', { method: 'POST', body: formData });
+      const result = await response.json() as { storagePath?: string; error?: string };
+      if (!response.ok) throw new Error(result.error || 'Storage upload failed.');
+      updatePhoto(target, photo.id, { uploadStatus: 'saved', storagePath: result.storagePath, uploadError: undefined });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Upload failed. Please try again.';
       updatePhoto(target, photo.id, { uploadStatus: 'error', uploadError: message });
@@ -98,6 +93,33 @@ export default function Home() {
 
   const setPhotoLabel = (id: string, label: PhotoLabel) => {
     setPhotos((current) => current.map((photo) => photo.id === id ? { ...photo, label } : photo));
+  };
+
+  const startTraining = async () => {
+    setTrainingStatus('training');
+    setTrainingProgress(null);
+    setTrainingRound(null);
+    setTrainingError(null);
+
+    try {
+      const response = await fetch('/api/training', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          rounds: trainingRounds,
+          photos: photos.map(({ storagePath, label }) => ({ storagePath, label })),
+        }),
+      });
+      const result = await response.json() as { error?: string };
+      if (!response.ok) throw new Error(result.error || 'Training could not be started.');
+
+      setTrainingStatus('complete');
+      setTrainingProgress(100);
+      setTrainingRound(trainingRounds);
+    } catch (error) {
+      setTrainingError(error instanceof Error ? error.message : 'Training could not be started.');
+      setTrainingStatus('error');
+    }
   };
 
   const labeledCount = photos.filter((photo) => photo.label).length;
@@ -171,15 +193,31 @@ export default function Home() {
           {step === 3 && (
             <>
               <div className="training-panel" aria-live="polite">
-                {trainingStatus === 'idle' && <EmptyState title="Training results will appear here" description="Once model training is connected, its progress and results can be shown in this space." />}
+                {trainingStatus === 'idle' && <EmptyState title="Ready to train" description={`${photos.length} labeled photos will be sent to the training service for ${trainingRounds} rounds.`} />}
                 {trainingStatus === 'training' && <ProgressDisplay progress={trainingProgress} round={trainingRound} />}
                 {trainingStatus === 'complete' && <div className="status-message success-message"><span className="status-icon">✓</span><div><strong>Training complete</strong><p>Your model is ready to test with new photos.</p></div></div>}
-                {trainingStatus === 'error' && <div className="status-message error-message"><span className="status-icon">!</span><div><strong>Training did not complete</strong><p>Try again when the training service is available.</p></div></div>}
+                {trainingStatus === 'error' && <div className="status-message error-message"><span className="status-icon">!</span><div><strong>Training did not start</strong><p>{trainingError}</p></div></div>}
               </div>
+              <fieldset className="round-selector" disabled={trainingStatus === 'training'}>
+                <legend>Training rounds</legend>
+                <div className="round-options">
+                  {([10, 25, 50] as const).map((rounds) => (
+                    <label className={trainingRounds === rounds ? 'round-option is-selected' : 'round-option'} key={rounds}>
+                      <input type="radio" name="training-rounds" value={rounds} checked={trainingRounds === rounds} onChange={() => setTrainingRounds(rounds)} />
+                      <span>{rounds} rounds</span>
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
               <InfoNote><strong>What is happening?</strong> After each round the model checks its guesses and adjusts.</InfoNote>
               <div className="actions actions-between">
                 <BackButton onClick={() => setStep(2)} />
-                <MainButton onClick={() => setStep(4)}>Continue to testing <ArrowIcon /></MainButton>
+                <div className="training-actions">
+                  <MainButton onClick={() => void startTraining()} disabled={trainingStatus === 'training' || photos.length === 0 || labeledCount !== photos.length || uploadsPending}>
+                    {trainingStatus === 'training' ? 'Starting…' : trainingStatus === 'complete' ? 'Train again' : 'Train model'}
+                  </MainButton>
+                  <MainButton onClick={() => setStep(4)}>Continue to testing <ArrowIcon /></MainButton>
+                </div>
               </div>
             </>
           )}

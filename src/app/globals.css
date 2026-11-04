@@ -104,6 +104,13 @@ button:focus-visible { outline: 3px solid #91a6ff; outline-offset: 3px; }
 .empty-state p { max-width: 560px; margin: 7px 0 0; color: var(--muted); font-size: 16px; line-height: 1.5; }
 .training-panel { margin-bottom: 24px; }
 .training-panel .empty-state { min-height: 390px; border-style: solid; }
+.round-selector { min-width: 0; margin: 0; padding: 0; border: 0; }
+.round-selector legend { margin-bottom: 12px; font-weight: 600; }
+.round-options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.round-option { display: flex; min-height: 56px; align-items: center; justify-content: center; gap: 9px; border: 1.5px solid var(--line); border-radius: 12px; color: var(--ink); cursor: pointer; }
+.round-option.is-selected { border-color: var(--blue); background: var(--blue-soft); color: var(--blue); font-weight: 600; }
+.round-option input { accent-color: var(--blue); }
+.training-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 12px; }
 .progress-display { padding: 44px 24px; }
 .progress-heading { display: flex; justify-content: space-between; margin-bottom: 12px; font-size: 18px; }
 .progress-track { height: 14px; overflow: hidden; border: 1px solid var(--line); border-radius: 99px; background: var(--page); }

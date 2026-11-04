@@ -11,3 +11,20 @@ generator client {
 datasource db {
   provider = "postgresql"
 }
+enum Label {
+  cat 
+  not_cat
+}
+enum Ground {
+  training 
+  testing 
+}
+model Photo {
+  id String @id @default(uuid())
+  storagePath String @unique
+  label Label?
+  ground Ground @default(training)
+  createdAt DateTime @default(now())
+
+  @@map("training-photos")
+}
